@@ -37,6 +37,30 @@
   </div>
 
   <div class="card">
+    <h2>Client access</h2>
+    <p class="field-hint" style="margin-bottom:0.75rem;">
+      For a separate Android/desktop frontend: use one of these base URLs and send this
+      token as <code>Authorization: Bearer &lt;token&gt;</code> on every request except
+      <code>/health</code>. See DOCUMENTATION.md's "Frontend auth setup" section.
+    </p>
+    <div class="field">
+      <label>Base URL (same machine)</label>
+      <input id="localhost-url" readonly>
+    </div>
+    <div class="field">
+      <label>Base URL (LAN -- e.g. a physical Android device on the same WiFi)</label>
+      <input id="lan-url" readonly>
+    </div>
+    <div class="field">
+      <label>API token</label>
+      <input id="access-token" readonly>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="btn-copy-token">Copy token</button>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>Logs</h2>
     <div id="log" style="display:block;min-height:200px;"></div>
   </div>
@@ -104,13 +128,24 @@ async function runNow() {
   setTimeout(() => { document.getElementById('btn-run-now').disabled = false; }, 3000);
 }
 
+async function loadClientAccess() {
+  const info = await window.pywebview.api.get_client_access_info();
+  document.getElementById('localhost-url').value = info.localhost_url;
+  document.getElementById('lan-url').value = info.lan_url || '(no network interface detected)';
+  document.getElementById('access-token').value = info.token;
+}
+
 document.getElementById('btn-start').addEventListener('click', startServer);
 document.getElementById('btn-stop').addEventListener('click', stopServer);
 document.getElementById('btn-run-now').addEventListener('click', runNow);
+document.getElementById('btn-copy-token').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(document.getElementById('access-token').value);
+});
 window.addEventListener('pywebviewready', () => {
   refreshStatus();
   refreshLogs();
   refreshPipelineLogs();
+  loadClientAccess();
   setInterval(refreshStatus, 2000);
   setInterval(refreshLogs, 2000);
   setInterval(refreshPipelineLogs, 2000);

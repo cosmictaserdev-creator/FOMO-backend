@@ -27,16 +27,49 @@ Authorization: Bearer <API_AUTH_TOKEN>
 ```
 
 `API_AUTH_TOKEN` is a single static token (not a per-user JWT -- this is a personal,
-single-user app). The desktop app generates and stores it in `backend/.env` on first run
-and injects it into the Ktor process's environment; get it from there, or from the
-desktop app's `secrets_store.get_or_create_api_auth_token()`.
+single-user app). The desktop app generates it once, stores it in `backend/.env`, and
+injects it into the Ktor process's environment on every start.
 
 - Missing/wrong token -> `401 Unauthorized`
 - The server refuses to boot at all if `API_AUTH_TOKEN` isn't set in its environment
 
-CORS is restricted to `http://localhost:<port>` and `http://127.0.0.1:<port>`. A web-based
-client on a different origin, or a mobile emulator (e.g. Android's `10.0.2.2`), will need
-that allowlist extended in `ktor-api/src/main/kotlin/com/trendhopper/plugins/CORS.kt`.
+CORS is restricted to `http://localhost:<port>` and `http://127.0.0.1:<port>`. This is a
+non-issue for a native Android app or a Compose Desktop app making requests with
+OkHttp/Ktor-client -- CORS is a browser-only mechanism and doesn't apply to native HTTP
+clients. It only matters if you build a browser-based/PWA frontend, in which case extend
+the allowlist in `ktor-api/src/main/kotlin/com/trendhopper/plugins/CORS.kt`.
+
+## Frontend auth setup (separate Android/desktop client project)
+
+There's no login flow and no per-device provisioning -- this is a personal single-user
+backend, so the handoff from "desktop app that owns the token" to "separate frontend
+project that needs to send it" is a manual, one-time step:
+
+1. **Get the token and base URL.** Open the desktop app's **Dashboard** tab -- the
+   "Client access" card shows:
+   - `localhost_url` (`http://127.0.0.1:<port>`) -- use this if the frontend runs on the
+     *same machine* as the backend (e.g. a Compose Desktop build during dev).
+   - `lan_url` (`http://<lan-ip>:<port>`) -- use this from a **physical Android device**
+     on the same WiFi as the backend machine. (From an **Android emulator** instead,
+     use `http://10.0.2.2:<port>` -- the emulator's special alias for the host's
+     localhost -- rather than the LAN IP.)
+   - `token` -- the bearer token, with a copy-to-clipboard button.
+2. **Paste it into the frontend once.** The simplest approach: a one-time settings screen
+   in the frontend (base URL + token fields) that the user fills in from the values
+   above, matching how the desktop app's own Setup screen works for its API keys. Don't
+   hardcode the token into the frontend's source/build -- it's a per-install secret.
+3. **Store it securely on-device** and attach it to every request:
+   `Authorization: Bearer <token>`. On Android, `EncryptedSharedPreferences` (or the
+   Jetpack Security library) is the standard place for this; don't put it in plain
+   `SharedPreferences` or a Room table.
+4. **On a `401`**: the token was never set, was mistyped, or the backend's `.env` got
+   regenerated (deleting/recreating `backend/.env` mints a new token) -- prompt the user
+   back to the settings screen rather than retrying silently, since retries won't help.
+
+If you'd rather not hand-copy the token at all, the alternative is building a small
+pairing flow (e.g. the desktop app shows a QR code encoding `{base_url, token}` that the
+Android app scans) -- worth doing later if manual copy-paste becomes annoying, not needed
+to start building.
 
 ## Response envelope
 

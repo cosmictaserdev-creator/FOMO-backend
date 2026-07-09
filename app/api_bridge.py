@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import socket
 import traceback
 from typing import Any
 
@@ -101,6 +102,28 @@ class ApiBridge:
 
     def server_logs(self) -> list[str]:
         return _ktor.logs()
+
+    def get_client_access_info(self) -> dict[str, Any]:
+        """For a separate frontend (Android/desktop client): the base URL(s) to hit and
+        the bearer token to send on every request. See DOCUMENTATION.md's "Frontend auth
+        setup" section for the full handoff story."""
+        lan_ip = None
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.connect(("8.8.8.8", 80))  # no packet actually sent; just picks a local route
+                lan_ip = s.getsockname()[0]
+            finally:
+                s.close()
+        except OSError:
+            pass
+
+        return {
+            "port": _ktor.port,
+            "localhost_url": f"http://127.0.0.1:{_ktor.port}",
+            "lan_url": f"http://{lan_ip}:{_ktor.port}" if lan_ip else None,
+            "token": secrets_store.get_or_create_api_auth_token(),
+        }
 
     # -- Pipeline: manual run + scheduler log tail ----------------------
 
