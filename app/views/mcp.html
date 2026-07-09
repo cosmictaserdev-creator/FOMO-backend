@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FOMO MCP</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <a href="setup.html">Setup</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="settings.html">Settings</a>
+    <a href="mcp.html" class="active">MCP</a>
+  </div>
+
+  <h1>MCP (AI assistant) access</h1>
+  <p class="subtitle">Let Claude Desktop or Claude Code read and change your topics, sources, threshold and schedule through conversation.</p>
+
+  <div class="card">
+    <h2>1. Copy this into your Claude Desktop config</h2>
+    <p class="field-hint" style="margin-bottom:0.75rem;">
+      File location: <code>%APPDATA%\Claude\claude_desktop_config.json</code>. If the file already
+      has a <code>mcpServers</code> section, merge this entry into it rather than replacing the file.
+    </p>
+    <div id="config-json" class="log-panel" style="display:block;"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-copy">Copy to clipboard</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Restart Claude Desktop</h2>
+    <p style="font-size:0.875rem;">
+      Fully quit and reopen Claude Desktop (not just close the window) so it picks up the new
+      server entry.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Available tools</h2>
+    <p class="field-hint" style="margin-bottom:0.75rem;">
+      This is configuration-only access -- it does not expose your favorites, notes, or chat history.
+    </p>
+    <div class="topic-list" id="tool-list"></div>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<script>
+function log(msg, cls = 'info') {
+  const el = document.getElementById('log');
+  el.style.display = 'block';
+  const ts = new Date().toLocaleTimeString();
+  el.innerHTML += `<span class="${cls}">[${ts}] ${msg}</span>\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+async function load() {
+  const data = await window.pywebview.api.get_mcp_config();
+  document.getElementById('config-json').textContent = data.config_json;
+  const list = document.getElementById('tool-list');
+  list.innerHTML = '';
+  data.tools.forEach(name => {
+    const row = document.createElement('div');
+    row.className = 'topic-row';
+    row.innerHTML = `<span>${name}</span>`;
+    list.appendChild(row);
+  });
+}
+
+document.getElementById('btn-copy').addEventListener('click', async () => {
+  const text = document.getElementById('config-json').textContent;
+  await navigator.clipboard.writeText(text);
+  log('Copied to clipboard', 'ok');
+});
+
+window.addEventListener('pywebviewready', load);
+</script>
+</body>
+</html>

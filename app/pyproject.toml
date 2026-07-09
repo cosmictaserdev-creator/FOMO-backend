@@ -1,0 +1,30 @@
+[project]
+name = "trend-hopper-app"
+version = "0.1.0"
+description = "FOMO desktop control panel -- API key setup, Ktor server control, pipeline schedule and settings"
+requires-python = ">=3.12"
+dependencies = [
+    # GUI
+    "pywebview>=5.3.1",
+    "pystray>=0.19.5",
+    "pillow>=10.0",
+    # backend/ (collector.py, config.py, db.py, ...) is imported directly via sys.path
+    # (see app/backend_path.py) rather than installed as a package -- it has no
+    # [build-system] and is a flat script layout, not a distributable library. Its own
+    # runtime deps are mirrored here so `uv sync` in app/ produces one complete venv.
+    "supabase>=2.0",
+    "groq>=0.5",
+    "praw>=7.7",
+    "feedparser>=6.0",
+    "beautifulsoup4>=4.12",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "httpx>=0.27",
+    "mcp>=1.0",
+    # Windows has no system IANA tz database; zoneinfo needs this package there to
+    # resolve any tz name (even "UTC") -- a no-op install on Linux/macOS.
+    "tzdata>=2024.1",
+]
+
+[dependency-groups]
+dev = ["pyinstaller>=6.10"]

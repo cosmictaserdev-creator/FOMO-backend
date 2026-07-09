@@ -12,7 +12,7 @@ fun Route.sourceRoutes() {
     route("/sources") {
         get {
             val resp = SupabaseClient.get("sources_config", mapOf("select" to "id,name,enabled,params,created_at", "order" to "name.asc"))
-            val body = SupabaseClient.parseMapList(resp)
+            val body = SupabaseClient.parseJsonList(resp)
             call.respond(ApiResponse.ok(body))
         }
 

@@ -1,6 +1,7 @@
 package com.trendhopper.routes
 
 import com.trendhopper.models.*
+import com.trendhopper.services.GroqClient
 import com.trendhopper.services.SupabaseClient
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -8,16 +9,8 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.*
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
 
 fun Route.agentRoutes() {
-    val groqApiKey: String by lazy { System.getenv("GROQ_API_KEY") ?: error("GROQ_API_KEY not set") }
-    val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build()
-
     route("/agent/chat") {
         get("/{favorite_id}") {
             val favoriteId = call.parameters["favorite_id"] ?: return@get call.respond(HttpStatusCode.BadRequest, ApiResponse.error<Unit>("Missing favorite_id"))
@@ -89,23 +82,7 @@ fun Route.agentRoutes() {
             allMessages.add(mapOf("role" to "user", "content" to request.message))
 
             // Call Groq
-            val groqPayload = Json.encodeToString(mapOf(
-                "model" to "llama-3.3-70b-versatile",
-                "messages" to allMessages,
-                "temperature" to 0.7,
-            ))
-            val groqReq = HttpRequest.newBuilder()
-                .uri(URI.create("https://api.groq.com/openai/v1/chat/completions"))
-                .header("Authorization", "Bearer $groqApiKey")
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(groqPayload))
-                .build()
-            val groqResp = httpClient.send(groqReq, HttpResponse.BodyHandlers.ofString())
-            val groqBody = Json.parseToJsonElement(groqResp.body()).jsonObject
-            val assistantContent = groqBody["choices"]?.jsonArray
-                ?.firstOrNull()?.jsonObject
-                ?.get("message")?.jsonObject
-                ?.get("content")?.jsonPrimitive?.content ?: ""
+            val assistantContent = GroqClient.chat(allMessages)
 
             // Persist messages
             val newMessagesArray = buildJsonArray {

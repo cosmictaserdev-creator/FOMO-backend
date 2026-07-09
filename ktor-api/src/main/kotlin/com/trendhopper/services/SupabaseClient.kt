@@ -1,9 +1,17 @@
 package com.trendhopper.services
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.longOrNull
 import java.net.URI
 import java.net.URLEncoder
 import java.net.http.HttpClient
@@ -24,7 +32,7 @@ object SupabaseClient {
         return "$url/rest/v1/$path${if (qs.isNotEmpty()) "?$qs" else ""}"
     }
 
-    fun get(path: String, query: Map<String, String> = emptyMap()): String {
+    suspend fun get(path: String, query: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(buildUrl(path, query)))
             .header("apikey", key)
@@ -33,10 +41,10 @@ object SupabaseClient {
             .build()
         val resp = client.send(request, HttpResponse.BodyHandlers.ofString())
         if (resp.statusCode() >= 400) throw RuntimeException("Supabase GET $path: ${resp.statusCode()} ${resp.body()}")
-        return resp.body()
+        resp.body()
     }
 
-    fun post(path: String, body: Map<String, Any?>): String {
+    suspend fun post(path: String, body: Map<String, Any?>): String = withContext(Dispatchers.IO) {
         val jsonBody = mapToJson(body)
         val request = HttpRequest.newBuilder()
             .uri(URI.create(buildUrl(path)))
@@ -48,10 +56,10 @@ object SupabaseClient {
             .build()
         val resp = client.send(request, HttpResponse.BodyHandlers.ofString())
         if (resp.statusCode() >= 400) throw RuntimeException("Supabase POST $path: ${resp.statusCode()} ${resp.body()}")
-        return resp.body()
+        resp.body()
     }
 
-    fun put(path: String, body: Map<String, Any?>, query: Map<String, String> = emptyMap()): String {
+    suspend fun put(path: String, body: Map<String, Any?>, query: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
         val jsonBody = mapToJson(body)
         val request = HttpRequest.newBuilder()
             .uri(URI.create(buildUrl(path, query)))
@@ -63,10 +71,10 @@ object SupabaseClient {
             .build()
         val resp = client.send(request, HttpResponse.BodyHandlers.ofString())
         if (resp.statusCode() >= 400) throw RuntimeException("Supabase PATCH $path: ${resp.statusCode()} ${resp.body()}")
-        return resp.body()
+        resp.body()
     }
 
-    fun delete(path: String, query: Map<String, String> = emptyMap()): String {
+    suspend fun delete(path: String, query: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(buildUrl(path, query)))
             .header("apikey", key)
@@ -75,7 +83,7 @@ object SupabaseClient {
             .build()
         val resp = client.send(request, HttpResponse.BodyHandlers.ofString())
         if (resp.statusCode() >= 400) throw RuntimeException("Supabase DELETE $path: ${resp.statusCode()} ${resp.body()}")
-        return resp.body()
+        resp.body()
     }
 
     private fun mapToJson(map: Map<String, Any?>): String {
@@ -96,8 +104,22 @@ object SupabaseClient {
         return json.decodeFromString(ListSerializer(kotlinx.serialization.serializer<T>()), jsonStr)
     }
 
+    // Unwraps a JsonElement into a plain Kotlin value so callers doing `.toString()` on the
+    // result get the natural representation (e.g. "70", not "\"70\"") instead of re-serialized JSON.
+    private fun unwrap(element: JsonElement): Any? = when (element) {
+        is JsonNull -> null
+        is JsonPrimitive -> if (element.isString) element.content else element.booleanOrNull ?: element.longOrNull ?: element.doubleOrNull ?: element.content
+        is JsonArray -> element.map { unwrap(it) }
+        is JsonObject -> element.mapValues { (_, v) -> unwrap(v) }
+    }
+
     fun parseMapList(jsonStr: String): List<Map<String, Any?>> {
         val element = json.parseToJsonElement(jsonStr) as JsonArray
-        return element.map { (it as JsonObject).toMap() }
+        return element.map { (it as JsonObject).mapValues { (_, v) -> unwrap(v) } }
+    }
+
+    fun parseJsonList(jsonStr: String): List<JsonObject> {
+        val element = json.parseToJsonElement(jsonStr) as JsonArray
+        return element.map { it as JsonObject }
     }
 }

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FOMO Settings</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <a href="setup.html">Setup</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="settings.html" class="active">Settings</a>
+    <a href="mcp.html">MCP</a>
+  </div>
+
+  <h1>Settings</h1>
+  <p class="subtitle">Threshold, retention, schedule, topics and sources -- shared with the MCP server and Ktor API</p>
+
+  <div class="card">
+    <h2>Collection</h2>
+    <div class="field">
+      <label for="threshold">Relevance threshold (0-100)</label>
+      <input id="threshold" type="number" min="0" max="100">
+    </div>
+    <div class="field">
+      <label for="retention">Retention days (unfavorited items)</label>
+      <input id="retention" type="number" min="1">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-save-thresholds">Save</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Schedule</h2>
+    <p class="field-hint" style="margin-bottom:0.75rem;">
+      The app fires collection automatically at this time each day while it's running
+      (tray icon must be running -- see the Dashboard for server status).
+    </p>
+    <div class="field">
+      <label for="schedule-time">Time (24h, HH:MM)</label>
+      <input id="schedule-time" placeholder="06:00">
+    </div>
+    <div class="field">
+      <label for="schedule-tz">Timezone</label>
+      <input id="schedule-tz" placeholder="UTC">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-save-schedule">Save</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Topics</h2>
+    <div class="topic-list" id="topic-list"></div>
+    <div class="btn-row">
+      <input id="new-topic" placeholder="New topic name" style="flex:1;padding:0.5rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;">
+      <button class="btn btn-primary" id="btn-add-topic">Add</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sources</h2>
+    <div class="source-list" id="source-list"></div>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<script>
+function log(msg, cls = 'info') {
+  const el = document.getElementById('log');
+  el.style.display = 'block';
+  const ts = new Date().toLocaleTimeString();
+  el.innerHTML += `<span class="${cls}">[${ts}] ${msg}</span>\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+let currentSettings = null;
+
+async function loadSettings() {
+  currentSettings = await window.pywebview.api.get_settings();
+  document.getElementById('threshold').value = currentSettings.threshold;
+  document.getElementById('retention').value = currentSettings.retention_days;
+  document.getElementById('schedule-time').value = currentSettings.schedule_time;
+  document.getElementById('schedule-tz').value = currentSettings.schedule_timezone;
+  renderTopics();
+  renderSources();
+}
+
+function renderTopics() {
+  const list = document.getElementById('topic-list');
+  list.innerHTML = '';
+  currentSettings.topics.forEach(name => {
+    const row = document.createElement('div');
+    row.className = 'topic-row';
+    row.innerHTML = `<span>${name}</span><button class="btn btn-danger" style="padding:0.25rem 0.625rem;font-size:0.75rem;">Remove</button>`;
+    row.querySelector('button').addEventListener('click', async () => {
+      await window.pywebview.api.remove_topic(name);
+      log(`Removed topic '${name}'`, 'ok');
+      await loadSettings();
+    });
+    list.appendChild(row);
+  });
+}
+
+function renderSources() {
+  const list = document.getElementById('source-list');
+  list.innerHTML = '';
+  currentSettings.sources.forEach(src => {
+    const row = document.createElement('div');
+    row.className = 'source-row';
+    const checked = src.enabled ? 'checked' : '';
+    row.innerHTML = `<span>${src.name}</span><label><input type="checkbox" ${checked}> enabled</label>`;
+    row.querySelector('input').addEventListener('change', async (e) => {
+      await window.pywebview.api.toggle_source(src.name, e.target.checked);
+      log(`Source '${src.name}' ${e.target.checked ? 'enabled' : 'disabled'}`, 'ok');
+    });
+    list.appendChild(row);
+  });
+}
+
+document.getElementById('btn-save-thresholds').addEventListener('click', async () => {
+  await window.pywebview.api.set_relevance_threshold(parseInt(document.getElementById('threshold').value, 10));
+  await window.pywebview.api.set_retention_days(parseInt(document.getElementById('retention').value, 10));
+  log('Saved threshold and retention settings', 'ok');
+});
+
+document.getElementById('btn-save-schedule').addEventListener('click', async () => {
+  await window.pywebview.api.set_schedule(document.getElementById('schedule-time').value, document.getElementById('schedule-tz').value);
+  log('Saved schedule', 'ok');
+});
+
+document.getElementById('btn-add-topic').addEventListener('click', async () => {
+  const input = document.getElementById('new-topic');
+  const name = input.value.trim();
+  if (!name) return;
+  await window.pywebview.api.add_topic(name);
+  input.value = '';
+  log(`Added topic '${name}'`, 'ok');
+  await loadSettings();
+});
+
+window.addEventListener('pywebviewready', loadSettings);
+</script>
+</body>
+</html>

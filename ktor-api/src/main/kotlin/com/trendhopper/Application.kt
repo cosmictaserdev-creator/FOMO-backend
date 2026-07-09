@@ -13,5 +13,7 @@ fun Application.module() {
     configureSerialization()
     configureStatusPages()
     configureCORS()
+    configureAuth()
+    configureLogging()
     configureRouting()
 }

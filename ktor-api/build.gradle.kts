@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "2.1.20"
     kotlin("plugin.serialization") version "2.1.20"
+    id("io.ktor.plugin") version "3.1.1"
     application
 }
 
@@ -9,6 +10,12 @@ version = "0.1.0"
 
 application {
     mainClass.set("com.trendhopper.ApplicationKt")
+}
+
+ktor {
+    fatJar {
+        archiveFileName.set("trend-hopper-api.jar")
+    }
 }
 
 tasks.withType<JavaCompile> {
@@ -28,10 +35,9 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     implementation("io.ktor:ktor-server-auth:$ktorVersion")
-    implementation("io.ktor:ktor-server-auth-jwt:$ktorVersion")
     implementation("io.ktor:ktor-server-cors:$ktorVersion")
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
-
+    implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
 
     implementation("ch.qos.logback:logback-classic:1.5.16")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")

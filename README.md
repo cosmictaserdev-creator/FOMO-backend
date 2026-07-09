@@ -9,6 +9,22 @@ Three backend components:
 - **Python service layer** -- fetches from Reddit, Hacker News, GitHub Trending, RSS, YouTube, SoundCloud; scores items with Groq (Llama 70B) for relevance and viral potential; writes to Supabase.
 - **Ktor API** -- REST server for desktop/Android clients (items, favorites, notes, agent chat, search, sync status, stats).
 - **MCP server** -- exposes settings (topics, sources, thresholds, schedule) as MCP tools so any MCP-compatible AI client (Claude Desktop, Claude Code) can read and modify your configuration through conversation.
+- **Desktop control panel** (`app/`) -- a Windows GUI (system tray + window) that wraps all three: API key setup with inline instructions, Ktor server start/stop/status, a pipeline scheduler, settings, and a one-click MCP config helper. Packaged into a single installer (see below) with a bundled JRE and Python -- no separate Java/Python install needed.
+
+## Desktop app (recommended)
+
+Download/build `FomoSetup.exe` (see `installer/README` below) and run it -- no admin rights,
+no command line. It installs to `%LOCALAPPDATA%\FOMO`, adds a Start Menu shortcut, and optionally
+starts at login. First launch walks you through:
+
+1. **Setup** -- paste in your Supabase/Groq/Reddit/YouTube keys (each field links to where to get it).
+2. **Dashboard** -- start/stop the Ktor API, watch its logs, and trigger a manual collection run.
+3. **Settings** -- relevance threshold, retention days, schedule, topics, and sources.
+4. **MCP** -- copy-paste config for Claude Desktop, pointing at the app itself (no separate Python needed).
+
+To build the installer yourself: `JAVA_HOME=<jdk 23+> pwsh installer/build.ps1` (requires the Ktor
+JDK, `uv`, and Inno Setup 6+). It builds the Ktor fat jar, a jlink'd minimal JRE, the PyInstaller
+onedir bundle, and compiles `installer/output/FomoSetup.exe`.
 
 ## Project structure
 
@@ -40,6 +56,21 @@ ktor-api/                   # Ktor 3 REST server (JVM)
     services/               # SupabaseClient (Java HttpClient -> PostgREST)
   src/main/resources/application.yaml
 
+app/                         # Desktop control panel (pywebview + pystray)
+  main.py                    # Entry point; also handles hidden --run-pipeline-once / --mcp-server flags
+  api_bridge.py              # window.pywebview.api.* -- backs all four views
+  ktor_manager.py            # Starts/stops the bundled Ktor jar, tails its logs
+  scheduler.py               # Background thread firing collector->filter on a schedule
+  tray.py                    # System tray icon (Open/Start/Stop/Run Now/Quit)
+  secrets_store.py           # Reads/writes backend/.env, generates API_AUTH_TOKEN
+  mcp_config.py              # Builds the Claude Desktop config snippet
+  views/                     # setup.html, dashboard.html, settings.html, mcp.html
+  pyinstaller.spec
+
+installer/
+  build.ps1                  # Stages jre/ + ktor/ + PyInstaller output, runs Inno Setup
+  trendhopper.iss             # Inno Setup script (per-user install, no admin)
+
 supabase/
   001_schema.sql            # Full database schema + seed data
 
@@ -47,7 +78,10 @@ supabase/
   daily-collect.yml         # Cron schedule (6/12/18 UTC) with retention cleanup
 ```
 
-## Setup
+## Setup (development / manual)
+
+The desktop app above is the recommended path for normal use. The steps below are for developing
+the individual components directly.
 
 ### Prerequisites
 
@@ -75,16 +109,20 @@ uv run python filter.py
 
 ```bash
 cd ktor-api
-export JAVA_HOME=/path/to/jdk-26+
-./gradlew build
-SUPABASE_URL=... SUPABASE_KEY=... GROQ_API_KEY=... java -jar build/libs/trend-hopper-api.jar
+export JAVA_HOME=/path/to/jdk-23+
+./gradlew buildFatJar
+SUPABASE_URL=... SUPABASE_KEY=... GROQ_API_KEY=... API_AUTH_TOKEN=... java -jar build/libs/trend-hopper-api.jar
 ```
 
-The API serves on port 8080 (configurable via `PORT` env var).
+The API serves on port 8080 (configurable via `PORT` env var). All routes except `GET /health`
+require `Authorization: Bearer <API_AUTH_TOKEN>` -- the server refuses to start if `API_AUTH_TOKEN`
+isn't set. CORS is restricted to `localhost`/`127.0.0.1` on the configured port.
 
 ### MCP server
 
-Add the following to your `claude_desktop_config.json`:
+The desktop app's **MCP** tab generates this for you (pointing at the app itself, so Claude
+Desktop doesn't need a separate Python install). To wire it up manually instead, add the
+following to your `claude_desktop_config.json`:
 
 ```json
 {

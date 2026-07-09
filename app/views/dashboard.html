@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FOMO Dashboard</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <a href="setup.html">Setup</a>
+    <a href="dashboard.html" class="active">Dashboard</a>
+    <a href="settings.html">Settings</a>
+    <a href="mcp.html">MCP</a>
+  </div>
+
+  <div class="flex-between">
+    <div>
+      <h1>Dashboard</h1>
+      <p class="subtitle">Ktor API server status and logs</p>
+    </div>
+    <div>
+      <span id="status-badge" class="badge badge-pending">checking...</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Server</h2>
+    <p style="font-size:0.875rem;margin-bottom:0.75rem;">
+      Port: <b id="server-port">8080</b>
+    </p>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn btn-success" id="btn-start">Start Server</button>
+      <button class="btn btn-danger" id="btn-stop" disabled>Stop Server</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Logs</h2>
+    <div id="log" style="display:block;min-height:200px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Pipeline</h2>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn btn-primary" id="btn-run-now">Run Collection Now</button>
+    </div>
+    <div id="pipeline-log" class="log-panel" style="display:block;min-height:100px;max-height:250px;"></div>
+  </div>
+</div>
+
+<script>
+function setBadge(state) {
+  const badge = document.getElementById('status-badge');
+  const map = {
+    running: ['running', 'badge-ready'],
+    starting: ['starting...', 'badge-running'],
+    stopped: ['stopped', 'badge-pending'],
+  };
+  const [text, cls] = map[state] || ['unknown', 'badge-error'];
+  badge.textContent = text;
+  badge.className = 'badge ' + cls;
+  document.getElementById('btn-start').disabled = state === 'running' || state === 'starting';
+  document.getElementById('btn-stop').disabled = state === 'stopped';
+}
+
+async function refreshStatus() {
+  const status = await window.pywebview.api.server_status();
+  setBadge(status.state);
+  document.getElementById('server-port').textContent = status.port;
+}
+
+async function refreshLogs() {
+  const lines = await window.pywebview.api.server_logs();
+  const el = document.getElementById('log');
+  el.textContent = lines.join('\n');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function startServer() {
+  document.getElementById('btn-start').disabled = true;
+  const res = await window.pywebview.api.start_server();
+  if (!res.ok) alert('Failed to start: ' + res.error);
+  refreshStatus();
+}
+
+async function stopServer() {
+  document.getElementById('btn-stop').disabled = true;
+  await window.pywebview.api.stop_server();
+  refreshStatus();
+}
+
+async function refreshPipelineLogs() {
+  const lines = await window.pywebview.api.pipeline_logs();
+  const el = document.getElementById('pipeline-log');
+  el.textContent = lines.join('\n');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function runNow() {
+  document.getElementById('btn-run-now').disabled = true;
+  await window.pywebview.api.run_pipeline_now();
+  setTimeout(() => { document.getElementById('btn-run-now').disabled = false; }, 3000);
+}
+
+document.getElementById('btn-start').addEventListener('click', startServer);
+document.getElementById('btn-stop').addEventListener('click', stopServer);
+document.getElementById('btn-run-now').addEventListener('click', runNow);
+window.addEventListener('pywebviewready', () => {
+  refreshStatus();
+  refreshLogs();
+  refreshPipelineLogs();
+  setInterval(refreshStatus, 2000);
+  setInterval(refreshLogs, 2000);
+  setInterval(refreshPipelineLogs, 2000);
+});
+</script>
+</body>
+</html>

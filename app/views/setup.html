@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FOMO Setup</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <a href="setup.html" class="active">Setup</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="settings.html">Settings</a>
+    <a href="mcp.html">MCP</a>
+  </div>
+  <div class="flex-between">
+    <div>
+      <h1>FOMO Setup</h1>
+      <p class="subtitle">Configure API keys, then run the collection pipeline</p>
+    </div>
+    <div id="env-status">
+      <span id="env-badge" class="badge badge-pending">not saved</span>
+    </div>
+  </div>
+
+  <div class="card" style="background:#fef3c7;border:1px solid #f59e0b;">
+    <p style="font-size:0.8125rem;color:#92400e;">
+      First time setup: run the migration in <code style="background:#fff3cd;padding:0.125rem 0.375rem;border-radius:4px;">supabase/001_schema.sql</code>
+      in your Supabase project's SQL Editor. It creates all tables and default settings.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Supabase</h2>
+    <div class="field">
+      <label for="SUPABASE_URL">Project URL</label>
+      <input id="SUPABASE_URL" placeholder="https://your-project.supabase.co">
+    </div>
+    <div class="field">
+      <label for="SUPABASE_KEY">Service Role Key</label>
+      <input id="SUPABASE_KEY" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+    </div>
+    <p class="field-hint">
+      In your Supabase project, go to <b>Project Settings &rarr; API</b>. Copy the "Project URL"
+      and the <b>service_role</b> secret key (not the anon/public key -- the service role key is
+      required for the collector/filter/API to write data).
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Groq (LLM scoring &amp; agent chat)</h2>
+    <div class="field">
+      <label for="GROQ_API_KEY">API Key</label>
+      <input id="GROQ_API_KEY" placeholder="gsk_your_groq_key">
+    </div>
+    <p class="field-hint">
+      Create a free key at <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Reddit</h2>
+    <div class="field">
+      <label for="REDDIT_CLIENT_ID">Client ID</label>
+      <input id="REDDIT_CLIENT_ID" placeholder="your_client_id">
+    </div>
+    <div class="field">
+      <label for="REDDIT_CLIENT_SECRET">Client Secret</label>
+      <input id="REDDIT_CLIENT_SECRET" placeholder="your_client_secret">
+    </div>
+    <div class="field">
+      <label for="REDDIT_USERNAME">Username (for API identification)</label>
+      <input id="REDDIT_USERNAME" placeholder="your_reddit_username">
+    </div>
+    <p class="field-hint">
+      Request script-app access via Reddit's
+      <a href="https://www.reddit.com/prefs/apps" target="_blank">API access request form</a>
+      to get a Client ID and Secret. Add your Reddit username -- Reddit's API rules require it
+      for identification. Leave these blank to skip Reddit collection.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>YouTube</h2>
+    <div class="field">
+      <label for="YOUTUBE_API_KEY">API Key</label>
+      <input id="YOUTUBE_API_KEY" placeholder="your_youtube_api_key">
+    </div>
+    <p class="field-hint">
+      In the <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a>,
+      create a project (or use an existing one), enable the <b>YouTube Data API v3</b>, then create
+      an API key under <b>APIs &amp; Services &rarr; Credentials</b>. Leave blank to skip YouTube collection.
+    </p>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btn-save">Save Keys</button>
+    <button class="btn btn-success" id="btn-run" disabled>Run Collection Now</button>
+  </div>
+
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+  <div id="log"></div>
+</div>
+
+<script>
+const fields = ['SUPABASE_URL','SUPABASE_KEY','GROQ_API_KEY','REDDIT_CLIENT_ID','REDDIT_CLIENT_SECRET','REDDIT_USERNAME','YOUTUBE_API_KEY'];
+
+function log(msg, cls = 'info') {
+  const el = document.getElementById('log');
+  el.style.display = 'block';
+  const ts = new Date().toLocaleTimeString();
+  el.innerHTML += `<span class="${cls}">[${ts}] ${msg}</span>\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+async function loadStatus() {
+  const status = await window.pywebview.api.get_env_status();
+  fields.forEach(f => { if (status.values[f]) document.getElementById(f).value = status.values[f]; });
+  if (status.saved) {
+    document.getElementById('env-badge').textContent = 'saved';
+    document.getElementById('env-badge').className = 'badge badge-ready';
+    document.getElementById('btn-run').disabled = false;
+  }
+}
+
+async function saveEnv() {
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  const data = {};
+  fields.forEach(f => data[f] = document.getElementById(f).value.trim());
+  try {
+    const res = await window.pywebview.api.save_env(data);
+    if (res.ok) {
+      document.getElementById('env-badge').textContent = 'saved';
+      document.getElementById('env-badge').className = 'badge badge-ready';
+      document.getElementById('btn-run').disabled = false;
+      log('Saved successfully', 'ok');
+    } else {
+      log('Failed to save: ' + (res.error || 'unknown'), 'err');
+    }
+  } catch (e) {
+    log('Error saving: ' + e.message, 'err');
+  }
+  btn.disabled = false; btn.textContent = 'Save Keys';
+}
+
+async function runPipeline() {
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true; btn.textContent = 'Running...';
+  const bar = document.getElementById('progress-bar');
+  const fill = document.getElementById('progress-fill');
+  bar.style.display = 'block'; fill.style.width = '0%';
+
+  log('Step 1/2: Running collector...', 'info');
+  fill.style.width = '50%';
+  let res = await window.pywebview.api.run_collector();
+  if (res.ok) log('Collector done: ' + JSON.stringify(res.result), 'ok'); else log('Collector failed: ' + res.error, 'err');
+
+  log('Step 2/2: Running filter...', 'info');
+  fill.style.width = '90%';
+  res = await window.pywebview.api.run_filter();
+  if (res.ok) log('Filter done: ' + JSON.stringify(res.result), 'ok'); else log('Filter failed: ' + res.error, 'err');
+
+  fill.style.width = '100%';
+  log('Pipeline complete. Check the Dashboard tab or your Supabase table editor.', 'ok');
+  btn.disabled = false; btn.textContent = 'Run Again';
+  setTimeout(() => { bar.style.display = 'none'; fill.style.width = '0%'; }, 2000);
+}
+
+document.getElementById('btn-save').addEventListener('click', saveEnv);
+document.getElementById('btn-run').addEventListener('click', runPipeline);
+window.addEventListener('pywebviewready', loadStatus);
+</script>
+</body>
+</html>

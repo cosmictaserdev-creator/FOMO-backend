@@ -7,12 +7,14 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 
 fun Route.topicRoutes() {
     route("/topics") {
         get {
             val resp = SupabaseClient.get("topics", mapOf("select" to "id,name,active,created_at", "order" to "name.asc"))
-            val body = SupabaseClient.parseMapList(resp)
+            val body = SupabaseClient.parseJsonList(resp)
             call.respond(ApiResponse.ok(body))
         }
 
@@ -20,7 +22,7 @@ fun Route.topicRoutes() {
             val request = call.receive<TopicName>()
             try {
                 val resp = SupabaseClient.post("topics", mapOf("name" to request.name))
-                val created = SupabaseClient.parseMapList(resp)
+                val created = SupabaseClient.parseJsonList(resp)
                 call.respond(HttpStatusCode.Created, ApiResponse.ok(created.firstOrNull()))
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<Unit>(e.message ?: "Failed to create topic"))

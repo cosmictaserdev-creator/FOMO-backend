@@ -7,6 +7,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.jsonPrimitive
 
 fun Route.favoriteRoutes() {
     route("/favorites") {
@@ -16,12 +17,18 @@ fun Route.favoriteRoutes() {
                 "order" to "created_at.desc",
             ))
             val favorites = SupabaseClient.parse<FavoriteResponse>(resp)
+            if (favorites.isEmpty()) {
+                return@get call.respond(ApiResponse.ok(favorites))
+            }
+
+            val idsFilter = "in.(${favorites.joinToString(",") { it.id }})"
+            val notesResp = SupabaseClient.get("notes", mapOf("select" to "favorite_id", "favorite_id" to idsFilter))
+            val favIdsWithNotes = SupabaseClient.parseJsonList(notesResp).mapNotNull { it["favorite_id"]?.jsonPrimitive?.content }.toSet()
+            val chatResp = SupabaseClient.get("agent_chats", mapOf("select" to "favorite_id", "favorite_id" to idsFilter))
+            val favIdsWithChat = SupabaseClient.parseJsonList(chatResp).mapNotNull { it["favorite_id"]?.jsonPrimitive?.content }.toSet()
+
             val enriched = favorites.map { fav ->
-                val notesResp = SupabaseClient.get("notes", mapOf("select" to "id", "favorite_id" to "eq.${fav.id}", "limit" to "1"))
-                val notes = SupabaseClient.parseMapList(notesResp)
-                val chatResp = SupabaseClient.get("agent_chats", mapOf("select" to "id", "favorite_id" to "eq.${fav.id}", "limit" to "1"))
-                val chats = SupabaseClient.parseMapList(chatResp)
-                fav.copy(has_notes = notes.isNotEmpty(), has_chat = chats.isNotEmpty())
+                fav.copy(has_notes = favIdsWithNotes.contains(fav.id), has_chat = favIdsWithChat.contains(fav.id))
             }
             call.respond(ApiResponse.ok(enriched))
         }

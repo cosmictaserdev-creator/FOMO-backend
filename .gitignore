@@ -10,9 +10,16 @@ last_run.txt
 # Kotlin/Gradle
 ktor-api/build/
 ktor-api/.gradle/
+ktor-api/runtime/
 ktor-api/gradle/wrapper/gradle-wrapper.jar
 *.iml
 .idea/
+
+# PyInstaller / installer staging
+app/build/
+app/dist/
+installer/staging/
+installer/output/
 
 # OS
 .DS_Store

@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 import traceback
-from datetime import datetime, timezone
 from typing import Any
 
 import config
 import db
+
+
+_REQUIRED_ENV: dict[str, list[str]] = {
+    "reddit": ["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET"],
+    "youtube": ["YOUTUBE_API_KEY"],
+}
 
 
 def run() -> dict[str, Any]:
@@ -20,10 +26,17 @@ def run() -> dict[str, Any]:
 
         total = 0
         errors: list[str] = []
+        skipped: list[str] = []
 
         for src in sources:
             name: str = src["name"]
             params: dict = src.get("params", {})
+
+            missing = [v for v in _REQUIRED_ENV.get(name, []) if not os.environ.get(v)]
+            if missing:
+                skipped.append(f"{name} (missing: {', '.join(missing)})")
+                continue
+
             try:
                 module = importlib.import_module(f"sources.{name}")
                 items = module.fetch(params)
@@ -45,6 +58,7 @@ def run() -> dict[str, Any]:
             "status": "synced" if not errors else "failed",
             "new_items": total,
             "errors": errors,
+            "skipped": skipped,
         }
     except Exception as e:
         reason = _classify_error(e)
