@@ -79,15 +79,9 @@ Returns up to 100 `ItemResponse` objects:
   "llm_summary": "string",       // nullable, one-sentence summary
   "published_at": "ISO 8601",    // nullable
   "fetched_at": "ISO 8601",      // nullable
-  "is_favorited": false          // always false from this endpoint today -- see note below
+  "is_favorited": false          // true if a favorites row exists for this item
 }
 ```
-
-**Known gap**: `is_favorited` is never actually populated true/false against the
-`favorites` table by this route -- a client that needs "is this item favorited" today has
-to cross-reference the separate `GET /favorites` list client-side. Worth fixing
-server-side (a batched join, same pattern as `FavoritesRoutes`'s `has_notes`/`has_chat`)
-if this becomes a real pain point.
 
 ### `GET /items/{id}`
 Single `ItemResponse`, or `404` if not found.
@@ -157,12 +151,12 @@ GET), with the new user + assistant messages appended.
 
 ### `GET /stats?range=day|week|month`
 ```jsonc
-{ "total_items": 0, "total_favorites": 0, "avg_relevance": null, "per_source": [ { "source": "reddit", "count": 12 } ] }
+{ "total_items": 0, "total_favorites": 0, "avg_relevance": 65.9, "per_source": [ { "source": "reddit", "count": 12 } ] }
 ```
-Note: `total_favorites` and the `favorites` count are **all-time**, not scoped to `range`
-(only `total_items`/`per_source` respect the range window) -- and `avg_relevance` is
-currently always `null` (never computed). Both are worth flagging if a dashboard UI is
-built expecting them to be live numbers.
+All four fields are scoped to `range`: `total_favorites` counts favorites *created* within
+the window (not all-time), and `avg_relevance` is the mean `relevance_score` across items
+in the window (`null` only if there are zero items). `range=all` isn't actually
+supported here (unlike `/items`) -- any unrecognized value falls back to the week window.
 
 ### `GET /calendar?month=YYYY-MM`
 ```jsonc

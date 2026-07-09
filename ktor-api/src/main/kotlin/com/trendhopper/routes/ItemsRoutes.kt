@@ -9,6 +9,14 @@ import io.ktor.server.routing.*
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
+private suspend fun withFavoritedFlag(items: List<ItemResponse>): List<ItemResponse> {
+    if (items.isEmpty()) return items
+    val idsFilter = "in.(${items.joinToString(",") { it.id }})"
+    val resp = SupabaseClient.get("favorites", mapOf("select" to "item_id", "item_id" to idsFilter))
+    val favoritedIds = SupabaseClient.parseMapList(resp).mapNotNull { it["item_id"]?.toString() }.toSet()
+    return items.map { it.copy(is_favorited = favoritedIds.contains(it.id)) }
+}
+
 fun Route.itemRoutes() {
     route("/items") {
         get {
@@ -34,7 +42,7 @@ fun Route.itemRoutes() {
 
             val resp = SupabaseClient.get("items", query)
             val items = SupabaseClient.parse<ItemResponse>(resp)
-            call.respond(ApiResponse.ok(items))
+            call.respond(ApiResponse.ok(withFavoritedFlag(items)))
         }
 
         get("/{id}") {
@@ -45,7 +53,7 @@ fun Route.itemRoutes() {
             ))
             val items = SupabaseClient.parse<ItemResponse>(resp)
             val item = items.firstOrNull() ?: return@get call.respond(HttpStatusCode.NotFound, ApiResponse.error<Unit>("Item not found"))
-            call.respond(ApiResponse.ok(item))
+            call.respond(ApiResponse.ok(withFavoritedFlag(listOf(item)).first()))
         }
     }
 }

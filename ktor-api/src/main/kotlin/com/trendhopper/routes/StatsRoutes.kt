@@ -21,7 +21,7 @@ fun Route.statsRoutes() {
         }
 
         val itemsResp = SupabaseClient.get("items", mapOf(
-            "select" to "id,source",
+            "select" to "id,source,relevance_score",
             "fetched_at" to "gte.$fromDate",
         ))
         val items = SupabaseClient.parseMapList(itemsResp)
@@ -31,13 +31,18 @@ fun Route.statsRoutes() {
             .map { SourceStat(it.key, it.value.size) }
             .sortedByDescending { it.count }
 
-        val favoritesResp = SupabaseClient.get("favorites", mapOf("select" to "id"))
+        val relevanceScores = items.mapNotNull { (it["relevance_score"] as? Number)?.toDouble() }
+        val avgRelevance = if (relevanceScores.isEmpty()) null else relevanceScores.average()
+
+        // Scoped to the same range as total_items/per_source, by when each favorite was
+        // created -- not an all-time count (fixes a bug where this ignored `range` entirely).
+        val favoritesResp = SupabaseClient.get("favorites", mapOf("select" to "id", "created_at" to "gte.$fromDate"))
         val favorites = SupabaseClient.parseMapList(favoritesResp)
 
         val stats = StatsResponse(
             total_items = items.size,
             total_favorites = favorites.size,
-            avg_relevance = null,
+            avg_relevance = avgRelevance,
             per_source = perSource,
         )
 
