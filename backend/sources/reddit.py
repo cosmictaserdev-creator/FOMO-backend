@@ -59,8 +59,9 @@ def fetch(params: dict[str, Any]) -> list[dict[str, Any]]:
                 break
             except prawcore.exceptions.Forbidden:
                 raise RuntimeError(
-                    f"Reddit access denied for r/{sub_name}. Ensure your app is registered at "
-                    f"https://www.reddit.com/prefs/apps and has the correct scopes."
+                    f"Reddit access denied for r/{sub_name}. Reddit now requires API access approval. "
+                    f"Submit a request at https://support.reddithelp.com/hc/en-us/requests/new "
+                    f"(select 'API support' > 'Developer -- building a non-commercial app')."
                 )
             except prawcore.exceptions.ResponseException as e:
                 if e.response.status_code == 429:
