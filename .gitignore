@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+last_run.txt
+
+# Kotlin/Gradle
+ktor-api/build/
+ktor-api/.gradle/
+ktor-api/gradle/wrapper/gradle-wrapper.jar
+*.iml
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

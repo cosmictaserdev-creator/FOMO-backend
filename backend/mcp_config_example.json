@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "trend-hopper": {
+      "command": "python",
+      "args": [
+        "path/to/trend-hopper/backend/mcp_server.py"
+      ]
+    }
+  }
+}

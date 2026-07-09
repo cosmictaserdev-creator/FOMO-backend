@@ -1,0 +1,13 @@
+ktor:
+  application:
+    modules:
+      - com.trendhopper.ApplicationKt.module
+  deployment:
+    port: ${PORT:-8080}
+
+supabase:
+  url: ${SUPABASE_URL}
+  key: ${SUPABASE_KEY}
+
+groq:
+  api_key: ${GROQ_API_KEY}
