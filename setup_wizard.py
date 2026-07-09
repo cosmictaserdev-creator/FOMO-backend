@@ -136,6 +136,15 @@ HTML = r"""<!DOCTYPE html>
       <label for="REDDIT_CLIENT_SECRET">Client Secret</label>
       <input id="REDDIT_CLIENT_SECRET" placeholder="your_client_secret" value="">
     </div>
+    <div class="field">
+      <label for="REDDIT_USERNAME">Username (for API identification)</label>
+      <input id="REDDIT_USERNAME" placeholder="your_reddit_username" value="">
+    </div>
+    <p style="font-size:0.75rem;color:#6b7280;margin-top:0.25rem;">
+      Create a script app at
+      <a href="https://www.reddit.com/prefs/apps" target="_blank" style="color:#6366f1;">reddit.com/prefs/apps</a>
+      to get Client ID and Secret. Add your Reddit username for API compliance.
+    </p>
   </div>
 
   <div class="card">
@@ -156,7 +165,7 @@ HTML = r"""<!DOCTYPE html>
 </div>
 
 <script>
-const fields = ['SUPABASE_URL','SUPABASE_KEY','GROQ_API_KEY','REDDIT_CLIENT_ID','REDDIT_CLIENT_SECRET','YOUTUBE_API_KEY'];
+const fields = ['SUPABASE_URL','SUPABASE_KEY','GROQ_API_KEY','REDDIT_CLIENT_ID','REDDIT_CLIENT_SECRET','REDDIT_USERNAME','YOUTUBE_API_KEY'];
 
 async function saveEnv() {
   const btn = document.getElementById('btn-save');

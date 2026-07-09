@@ -103,7 +103,7 @@ Then restart Claude Desktop. The tools (get_settings, list_topics, list_sources,
 
 Set the following repository secrets:
 - `SUPABASE_URL`, `SUPABASE_KEY`, `GROQ_API_KEY`
-- `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `YOUTUBE_API_KEY`
+- `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `YOUTUBE_API_KEY`
 
 The workflow runs at 6:00, 12:00, and 18:00 UTC and handles collection, scoring, and retention cleanup.
 
