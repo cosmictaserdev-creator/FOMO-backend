@@ -45,18 +45,19 @@ jobs:
 
       - name: Retention cleanup
         working-directory: backend
-        run: uv run python -c "
-import os, sys, db, config
-from datetime import datetime, timezone, timedelta
-supa = db.get_supabase()
-if not supa:
-    print('Supabase not configured; skipping retention cleanup')
-    sys.exit(0)
-days = config.load_retention_days()
-cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-supa.table('items').delete().lt('fetched_at', cutoff.isoformat()).eq('never_favorited', True).execute()
-print(f'Retention cleanup: deleted items before {cutoff.isoformat()}')
-"
+        run: |
+          python -c "
+          import os, sys, db, config
+          from datetime import datetime, timezone, timedelta
+          supa = db.get_supabase()
+          if not supa:
+              print('Supabase not configured; skipping retention cleanup')
+              sys.exit(0)
+          days = config.load_retention_days()
+          cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+          supa.table('items').delete().lt('fetched_at', cutoff.isoformat()).eq('never_favorited', True).execute()
+          print('Retention cleanup: deleted items before', cutoff.isoformat())
+          "
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
