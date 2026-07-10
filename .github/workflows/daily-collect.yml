@@ -46,7 +46,7 @@ jobs:
       - name: Retention cleanup
         working-directory: backend
         run: |
-          python -c "
+          uv run python -c "
           import os, sys, db, config
           from datetime import datetime, timezone, timedelta
           supa = db.get_supabase()
