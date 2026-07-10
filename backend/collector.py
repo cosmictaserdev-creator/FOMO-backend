@@ -75,3 +75,11 @@ def _classify_error(e: Exception) -> str:
     if "timeout" in msg or "connection" in msg or "resolve" in msg:
         return "network_timeout"
     return "unknown"
+
+
+if __name__ == "__main__":
+    import json
+    result = run()
+    print(json.dumps(result, indent=2))
+    if result.get("status") == "failed":
+        sys.exit(1)

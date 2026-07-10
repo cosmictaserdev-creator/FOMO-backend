@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -28,8 +29,18 @@ def _invalidate_cache(key: str | None = None) -> None:
         _CACHE.clear()
 
 
+def _supabase_or_none():
+    supa = db.get_supabase()
+    if not supa:
+        print("Supabase not configured; returning empty config", file=sys.stderr)
+    return supa
+
+
 def load_settings() -> dict[str, str]:
-    rows = db.get_supabase().table("settings").select("*").execute()
+    supa = _supabase_or_none()
+    if not supa:
+        return {}
+    rows = supa.table("settings").select("*").execute()
     return {r["key"]: r["value"] for r in (rows.data or [])}
 
 
@@ -38,12 +49,18 @@ def get_setting(key: str, default: str | None = None) -> str | None:
 
 
 def load_active_topics() -> list[str]:
-    rows = db.get_supabase().table("topics").select("name").eq("active", True).execute()
+    supa = _supabase_or_none()
+    if not supa:
+        return []
+    rows = supa.table("topics").select("name").eq("active", True).execute()
     return [r["name"] for r in (rows.data or [])]
 
 
 def load_enabled_sources() -> list[dict[str, Any]]:
-    rows = db.get_supabase().table("sources_config").select("*").eq("enabled", True).execute()
+    supa = _supabase_or_none()
+    if not supa:
+        return []
+    rows = supa.table("sources_config").select("*").eq("enabled", True).execute()
     return rows.data or []
 
 
@@ -63,7 +80,10 @@ def load_retention_days() -> int:
 
 
 def list_all_sources() -> list[dict[str, Any]]:
-    rows = db.get_supabase().table("sources_config").select("name,enabled,params").execute()
+    supa = _supabase_or_none()
+    if not supa:
+        return []
+    rows = supa.table("sources_config").select("name,enabled,params").execute()
     return rows.data or []
 
 

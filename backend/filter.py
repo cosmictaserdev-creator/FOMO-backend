@@ -32,6 +32,10 @@ Items:
 
 def run() -> dict[str, Any]:
     try:
+        groq_key = os.environ.get("GROQ_API_KEY")
+        if not groq_key:
+            return {"status": "skipped", "reason": "GROQ_API_KEY not configured"}
+
         topics = config.load_active_topics()
         threshold = config.load_relevance_threshold()
         viral_keep = config.load_viral_keep_count()
@@ -43,7 +47,7 @@ def run() -> dict[str, Any]:
         if not unscored:
             return {"status": "skipped", "reason": "no_unscored_items"}
 
-        client = Groq(api_key=os.environ["GROQ_API_KEY"])
+        client = Groq(api_key=groq_key)
         total_scored = 0
         errors: list[str] = []
 
@@ -67,7 +71,10 @@ def run() -> dict[str, Any]:
 
 
 def _fetch_unscored() -> list[dict[str, Any]]:
-    result = db.get_supabase().table("items")\
+    supa = db.get_supabase()
+    if not supa:
+        return []
+    result = supa.table("items")\
         .select("id, title, text_content, source, url")\
         .is_("relevance_score", "null")\
         .order("fetched_at", desc=True)\
@@ -111,6 +118,8 @@ def _apply_scores(
     viral_keep: int,
 ) -> None:
     supa = db.get_supabase()
+    if not supa:
+        return
 
     for score in scores:
         idx = score.get("index")
@@ -153,3 +162,11 @@ def _apply_scores(
         relevance = int(score.get("relevance_score", 0))
         if relevance < threshold and item["id"] not in kept:
             supa.table("items").delete().eq("id", item["id"]).execute()
+
+
+if __name__ == "__main__":
+    import json
+    result = run()
+    print(json.dumps(result, indent=2))
+    if result.get("status") == "failed":
+        sys.exit(1)
