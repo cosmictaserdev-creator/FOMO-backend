@@ -10,7 +10,17 @@
     5. FomoSetup.exe (Inno Setup) in installer\output\
 
   Run from anywhere; paths below are relative to this script's location.
+
+.PARAMETER IncludePersonalEnv
+  Bakes backend\.env (your real Supabase/Groq/Reddit/YouTube keys + API_AUTH_TOKEN) into
+  the staged bundle, so a fresh install is already configured -- no Setup screen needed.
+  OFF by default: the normal build stays keyless so it's safe to hand to anyone. Only pass
+  this for a personal reinstall on your own machine, and don't share/upload that specific
+  FomoSetup.exe anywhere -- it will contain your live secrets in plaintext.
 #>
+param(
+    [switch]$IncludePersonalEnv
+)
 # Not "Stop": native tools (gradle/java/uv) routinely write benign chatter to stderr, and
 # PowerShell 5.1 wraps that as a terminating NativeCommandError under $ErrorActionPreference
 # = Stop even when the exe exits 0. Every native call below is checked via $LASTEXITCODE
@@ -64,6 +74,15 @@ New-Item -ItemType Directory -Force -Path (Join-Path $stagingDir "jre") | Out-Nu
 Copy-Item -Recurse "$runtimeDir\*" (Join-Path $stagingDir "jre")
 New-Item -ItemType Directory -Force -Path (Join-Path $stagingDir "ktor") | Out-Null
 Copy-Item $jarPath (Join-Path $stagingDir "ktor")
+
+if ($IncludePersonalEnv) {
+    $envPath = Join-Path $root "backend\.env"
+    if (-not (Test-Path $envPath)) { throw "IncludePersonalEnv was set but backend\.env doesn't exist" }
+    $envDestDir = Join-Path $stagingDir "_internal\backend"
+    New-Item -ItemType Directory -Force -Path $envDestDir | Out-Null
+    Copy-Item $envPath (Join-Path $envDestDir ".env")
+    Write-Host "Baked backend\.env into the staged bundle (personal build -- do not distribute)" -ForegroundColor Yellow
+}
 
 Write-Host "== 5. Compiling installer ==" -ForegroundColor Cyan
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null

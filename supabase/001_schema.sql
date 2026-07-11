@@ -36,6 +36,8 @@ create table items (
   viral_score float,
   matched_topic text,
   llm_summary text,
+  llm_reasoning text,
+  image_url text,
   published_at timestamptz,
   fetched_at timestamptz not null default now(),
   never_favorited boolean not null default true

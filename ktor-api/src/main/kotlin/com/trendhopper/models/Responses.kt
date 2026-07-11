@@ -20,10 +20,13 @@ data class ItemResponse(
     val source: String,
     val title: String,
     val url: String,
+    val text_content: String? = null,
+    val image_url: String? = null,
     val relevance_score: Int? = null,
     val viral_score: Double? = null,
     val matched_topic: String? = null,
     val llm_summary: String? = null,
+    val llm_reasoning: String? = null,
     val published_at: String? = null,
     val fetched_at: String? = null,
     val is_favorited: Boolean = false,
@@ -86,4 +89,18 @@ data class SyncStatusResponse(
     val state: String,
     val last_sync_at: String? = null,
     val last_error_reason: String? = null,
+)
+
+@Serializable
+data class SearchResponse(
+    val items: List<ItemResponse>,
+    val topics: List<String>,
+    val sources: List<Map<String, String?>>,
+)
+
+@Serializable
+data class SearchApiResponse(
+    val success: Boolean,
+    val data: SearchResponse? = null,
+    val error: String? = null,
 )

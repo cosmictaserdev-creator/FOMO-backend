@@ -14,5 +14,6 @@ fun Application.configureCORS() {
         // Extend this list (don't reopen to anyHost()) if a real remote/mobile client ships.
         allowHost("localhost:${System.getenv("PORT") ?: "8080"}", schemes = listOf("http"))
         allowHost("127.0.0.1:${System.getenv("PORT") ?: "8080"}", schemes = listOf("http"))
+
     }
 }

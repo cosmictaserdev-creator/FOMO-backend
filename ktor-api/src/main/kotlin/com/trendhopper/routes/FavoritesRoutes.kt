@@ -13,7 +13,7 @@ fun Route.favoriteRoutes() {
     route("/favorites") {
         get {
             val resp = SupabaseClient.get("favorites", mapOf(
-                "select" to "id,item_id,created_at,item:item_id(id,source,title,url,relevance_score,viral_score,matched_topic,llm_summary,published_at,fetched_at)",
+                "select" to "id,item_id,created_at,item:item_id(id,source,title,url,text_content,image_url,relevance_score,viral_score,matched_topic,llm_summary,llm_reasoning,published_at,fetched_at)",
                 "order" to "created_at.desc",
             ))
             val favorites = SupabaseClient.parse<FavoriteResponse>(resp)
@@ -38,8 +38,12 @@ fun Route.favoriteRoutes() {
             try {
                 val resp = SupabaseClient.post("favorites", mapOf("item_id" to request.item_id))
                 SupabaseClient.put("items", mapOf("never_favorited" to false), mapOf("id" to "eq.${request.item_id}"))
-                val created = SupabaseClient.parseMapList(resp)
-                call.respond(HttpStatusCode.Created, ApiResponse.ok(created.firstOrNull()))
+                // Parse into a @Serializable type — returning a raw Map<String, Any?> here fails at
+                // runtime with "Serializer for class 'ApiResponse' is not found".
+                val created = SupabaseClient.parse<FavoriteResponse>(resp)
+                val favorite = created.firstOrNull()
+                    ?: return@post call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<Unit>("Favorite was not returned by the database"))
+                call.respond(HttpStatusCode.Created, ApiResponse.ok(favorite))
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<Unit>(e.message ?: "Failed to create favorite"))
             }

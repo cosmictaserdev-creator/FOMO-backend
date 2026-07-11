@@ -20,6 +20,27 @@ _MAX_RETRIES = 3
 _RETRY_DELAY = 2.0
 
 
+def _extract_image(post: Any) -> str | None:
+    """Best-effort preview/thumbnail image for a Reddit post."""
+    try:
+        preview = getattr(post, "preview", None)
+        if preview:
+            images = preview.get("images") or []
+            if images:
+                src = images[0].get("source", {}).get("url")
+                if src:
+                    return src.replace("&amp;", "&")
+    except Exception:
+        pass
+    thumb = getattr(post, "thumbnail", "") or ""
+    if thumb.startswith("http"):
+        return thumb
+    url = getattr(post, "url", "") or ""
+    if url.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp")):
+        return url
+    return None
+
+
 def fetch(params: dict[str, Any]) -> list[dict[str, Any]]:
     missing = [k for k in ("REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET") if not os.environ.get(k)]
     if missing:
@@ -54,6 +75,7 @@ def fetch(params: dict[str, Any]) -> list[dict[str, Any]]:
                         "title": post.title,
                         "url": post.url,
                         "text_content": post.selftext[:1000] if post.selftext else "",
+                        "image_url": _extract_image(post),
                         "published_at": published.isoformat(),
                     })
                 break

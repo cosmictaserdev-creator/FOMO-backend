@@ -86,18 +86,22 @@ object SupabaseClient {
         resp.body()
     }
 
+    // Uses the JSON library's own encoder rather than manual string concatenation -- the old
+    // version only escaped `"`, so backslashes/newlines/control chars in user text (notes, chat
+    // messages) produced malformed JSON sent to Supabase.
     private fun mapToJson(map: Map<String, Any?>): String {
-        val entries = map.entries.joinToString(",") { (k, v) ->
-            val value = when (v) {
-                null -> "null"
-                is Boolean -> v.toString()
-                is Number -> v.toString()
-                is String -> "\"${v.replace("\"", "\\\"")}\""
-                else -> "\"${v.toString().replace("\"", "\\\"")}\""
-            }
-            "\"$k\":$value"
-        }
-        return "{$entries}"
+        val obj = JsonObject(map.mapValues { (_, v) -> anyToJsonElement(v) })
+        return json.encodeToString(JsonObject.serializer(), obj)
+    }
+
+    private fun anyToJsonElement(v: Any?): JsonElement = when (v) {
+        null -> JsonNull
+        is JsonElement -> v
+        is Boolean -> JsonPrimitive(v)
+        is Number -> JsonPrimitive(v)
+        is Map<*, *> -> JsonObject(v.entries.associate { (k, value) -> k.toString() to anyToJsonElement(value) })
+        is List<*> -> JsonArray(v.map { anyToJsonElement(it) })
+        else -> JsonPrimitive(v.toString())
     }
 
     inline fun <reified T> parse(jsonStr: String): List<T> {

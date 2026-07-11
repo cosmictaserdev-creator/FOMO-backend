@@ -30,11 +30,15 @@ fun Route.itemRoutes() {
                 else -> Instant.now().minus(7, ChronoUnit.DAYS).toString()
             }
 
+            // Order by recency so the freshest items are always in the returned window;
+            // the client then re-ranks by a composite of relevance + recency + virality.
+            // (Ordering by relevance_score alone buried fresh posts under week-old ones.)
+            val order = if (feed == "general") "viral_score.desc" else "fetched_at.desc"
             val query = mutableMapOf(
-                "select" to "id,source,title,url,relevance_score,viral_score,matched_topic,llm_summary,published_at,fetched_at",
+                "select" to "id,source,title,url,text_content,image_url,relevance_score,viral_score,matched_topic,llm_summary,llm_reasoning,published_at,fetched_at",
                 "relevance_score" to "gte.$minRelevance",
-                "order" to if (feed == "general") "viral_score.desc" else "relevance_score.desc",
-                "limit" to "100",
+                "order" to order,
+                "limit" to "150",
             )
             if (range != "all") {
                 query["fetched_at"] = "gte.$fromDate"
@@ -48,7 +52,7 @@ fun Route.itemRoutes() {
         get("/{id}") {
             val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest, ApiResponse.error<Unit>("Missing id"))
             val resp = SupabaseClient.get("items", mapOf(
-                "select" to "id,source,title,url,relevance_score,viral_score,matched_topic,llm_summary,published_at,fetched_at",
+                "select" to "id,source,title,url,text_content,image_url,relevance_score,viral_score,matched_topic,llm_summary,llm_reasoning,published_at,fetched_at",
                 "id" to "eq.$id",
             ))
             val items = SupabaseClient.parse<ItemResponse>(resp)

@@ -38,11 +38,14 @@ def fetch(params: dict[str, Any]) -> list[dict[str, Any]]:
             dt = datetime.fromisoformat(published.replace("Z", "+00:00"))
         else:
             dt = datetime.now(timezone.utc)
+        thumbs = snippet.get("thumbnails", {})
+        thumb = thumbs.get("high") or thumbs.get("medium") or thumbs.get("default") or {}
         items.append({
             "source": "youtube",
             "title": snippet.get("title", ""),
             "url": f"https://www.youtube.com/watch?v={video_id}",
             "text_content": (snippet.get("description") or "")[:1000],
+            "image_url": thumb.get("url") or None,
             "published_at": dt.isoformat(),
         })
 

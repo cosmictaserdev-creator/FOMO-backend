@@ -21,6 +21,13 @@ app/dist/
 installer/staging/
 installer/output/
 
+# Personal credentials -- never commit real API keys/tokens
+client-config/
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Crash dumps / ad-hoc run logs
+*.stackdump
+installed-test.log

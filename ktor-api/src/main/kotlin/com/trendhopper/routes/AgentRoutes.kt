@@ -59,11 +59,25 @@ fun Route.agentRoutes() {
                 }
             }
 
-            // Get item context
-            val itemResp = SupabaseClient.get("items", mapOf("select" to "title,url,llm_summary", "id" to "eq.${favoriteId.split("-").first()}"))
+            // Look up the item_id from favorites table, then get item context
+            val favResp = SupabaseClient.get("favorites", mapOf("select" to "item_id", "id" to "eq.$favoriteId"))
+            val favList = SupabaseClient.parseMapList(favResp)
+            val itemId = favList.firstOrNull()?.get("item_id")?.toString()
+            val itemResp = if (itemId != null) {
+                SupabaseClient.get("items", mapOf("select" to "title,url,llm_summary,text_content,llm_reasoning", "id" to "eq.$itemId"))
+            } else "[]"
             val itemContext = try {
                 val items = SupabaseClient.parseMapList(itemResp)
-                items.firstOrNull()?.let { "${it["title"] ?: ""} - ${it["llm_summary"] ?: it["url"] ?: ""}" } ?: ""
+                items.firstOrNull()?.let { item ->
+                    val title = item["title"] ?: ""
+                    val summary = item["llm_summary"] ?: ""
+                    val reason = item["llm_reasoning"] ?: ""
+                    buildString {
+                        append("Title: $title")
+                        if (summary.toString().isNotBlank()) append("\nSummary: $summary")
+                        if (reason.toString().isNotBlank()) append("\nWhy it matters: $reason")
+                    }
+                } ?: ""
             } catch (_: Exception) { "" }
 
             // Build messages list
