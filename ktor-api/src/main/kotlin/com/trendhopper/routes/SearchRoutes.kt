@@ -7,18 +7,22 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-// PostgREST treats \,.():  as filter-grammar syntax inside or()/ilike values, so a raw search
-// term containing them (e.g. "),id.neq.0--") could alter or extend the intended filter. Escaping
-// them with a backslash keeps the value literal per PostgREST's own escaping rules.
+// PostgREST treats ,.()  as filter-grammar syntax inside or()/ilike values, so a raw search term
+// containing them (e.g. "),id.neq.0--") could alter or extend the intended filter. Backslash-
+// escaping is ambiguous here (PostgREST's own combinator parser and Postgres's LIKE escape char
+// both interpret backslash, and getting both layers right at once is fragile -- verified against
+// a live Supabase instance to produce "LIKE pattern must not end with escape character" errors on
+// several inputs). Stripping the reserved characters instead guarantees a safe, valid query; the
+// search only needs a substring match, so losing a stray comma/paren/dot is an acceptable trade-off.
 private val POSTGREST_RESERVED = Regex("""[\\,.()]""")
 
-private fun escapePostgrestValue(raw: String): String =
-    raw.replace(POSTGREST_RESERVED) { "\\${it.value}" }
+private fun sanitizeSearchTerm(raw: String): String = raw.replace(POSTGREST_RESERVED, "")
 
 fun Route.searchRoutes() {
     get("/search") {
         val qRaw = call.request.queryParameters["q"] ?: return@get call.respond(HttpStatusCode.BadRequest, SearchApiResponse(success = false, error = "Missing q"))
-        val q = escapePostgrestValue(qRaw)
+        val q = sanitizeSearchTerm(qRaw)
+        if (q.isBlank()) return@get call.respond(HttpStatusCode.OK, SearchApiResponse(success = true, data = SearchResponse(items = emptyList(), topics = emptyList(), sources = emptyList())))
 
         val itemsResp = SupabaseClient.get("items", mapOf(
             "select" to "id,source,title,url,text_content,image_url,relevance_score,viral_score,matched_topic,llm_summary,llm_reasoning,published_at,fetched_at",
