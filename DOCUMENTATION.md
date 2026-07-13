@@ -7,16 +7,34 @@ deployed remotely; adjust the base URL accordingly.
 ## Base URL & running it
 
 ```
-http://127.0.0.1:8080          # default local port, see PORT env var
+http://127.0.0.1:8081          # Ktor API directly
+http://127.0.0.1:8080          # Python reverse proxy (serves test-ui.html + proxies API)
 ```
 
-Start it via the desktop app's Dashboard tab, or manually:
+Start the Ktor API via the desktop app's Dashboard tab, or manually:
 
 ```bash
 cd ktor-api
 JAVA_HOME=<jdk 23+> ./gradlew buildFatJar
 SUPABASE_URL=... SUPABASE_KEY=... GROQ_API_KEY=... API_AUTH_TOKEN=... java -jar build/libs/trend-hopper-api.jar
 ```
+
+Start the test UI proxy (optional, for testing):
+
+```bash
+python serve.py
+# Opens test-ui.html at http://localhost:8080
+```
+
+### Proxy-only endpoints
+
+The proxy (`serve.py`) provides additional endpoints that bypass Ktor:
+
+- `POST /api/format-article` — AI article formatting via Groq
+- `GET /api/agent/chat/{favorite_id}` — Chat history via Supabase
+- `POST /api/agent/chat/{favorite_id}` — Chat messages via Supabase + Groq
+
+These exist because the Ktor chat route has a double-encoding bug (`JsonArray.toString()` gets re-encoded as a JSON string). If you're building a client, use the Ktor endpoints directly — the bug only affects the chat route's `POST` when persisting messages.
 
 ## Authentication
 
@@ -103,7 +121,7 @@ Returns up to 100 `ItemResponse` objects:
 ```jsonc
 {
   "id": "uuid",
-  "source": "reddit" | "hackernews" | "github_trending" | "rss" | "youtube" | "soundcloud",
+  "source": "reddit" | "hackernews" | "github_trending" | "rss" | "youtube" | "soundcloud" | "lobsters" | "devto" | "mastodon" | "arxiv" | "huggingface" | "stackexchange",
   "title": "string",
   "url": "string",
   "relevance_score": 0,          // nullable, 0-100, set by filter.py

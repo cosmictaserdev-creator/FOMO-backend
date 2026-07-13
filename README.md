@@ -6,7 +6,7 @@ Personal tech trends aggregator. Collects trending content from multiple sources
 
 Three backend components:
 
-- **Python service layer** -- fetches from Reddit, Hacker News, GitHub Trending, RSS, YouTube, SoundCloud; scores items with Groq (Llama 70B) for relevance and viral potential; writes to Supabase.
+- **Python service layer** -- fetches from Reddit, Hacker News, GitHub Trending, RSS, YouTube, SoundCloud, Lobsters, Dev.to, Mastodon, arXiv, Hugging Face, Stack Exchange; scores items with Groq (Llama 70B) for relevance and viral potential; writes to Supabase.
 - **Ktor API** -- REST server for desktop/Android clients (items, favorites, notes, agent chat, search, sync status, stats).
 - **MCP server** -- exposes settings (topics, sources, thresholds, schedule) as MCP tools so any MCP-compatible AI client (Claude Desktop, Claude Code) can read and modify your configuration through conversation.
 - **Desktop control panel** (`app/`) -- a Windows GUI (system tray + window) that wraps all three: API key setup with inline instructions, Ktor server start/stop/status, a pipeline scheduler, settings, and a one-click MCP config helper. Packaged into a single installer (see below) with a bundled JRE and Python -- no separate Java/Python install needed.
@@ -43,6 +43,12 @@ backend/                    # Python service layer + MCP server
     rss.py                  # Generic RSS/Atom feedparser
     youtube.py              # YouTube Data API v3
     soundcloud.py           # SoundCloud charts API
+    lobsters.py             # Lobsters hottest.json
+    devto.py                # Dev.to top articles
+    mastodon.py             # Mastodon trending links
+    arxiv.py                # arXiv cs.AI/cs.LG feed
+    huggingface.py          # Hugging Face trending models
+    stackexchange.py        # Stack Exchange hot questions
   pyproject.toml            # uv-managed Python project
   .env.example
 
@@ -66,6 +72,9 @@ app/                         # Desktop control panel (pywebview + pystray)
   mcp_config.py              # Builds the Claude Desktop config snippet
   views/                     # setup.html, dashboard.html, settings.html, mcp.html
   pyinstaller.spec
+
+serve.py                     # Python reverse proxy (port 8080) — see "Test UI" section
+test-ui.html                 # Standalone HTML/JS/CSS test UI
 
 installer/
   build.ps1                  # Stages jre/ + ktor/ + PyInstaller output, runs Inno Setup
@@ -92,7 +101,7 @@ the individual components directly.
 
 ### Database
 
-Run `supabase/001_schema.sql` in your Supabase SQL editor. This creates all tables (settings, topics, sources_config, items, favorites, notes, agent_chats, sync_log) with seed data for default topics and sources.
+Run `supabase/001_schema.sql` in your Supabase SQL editor. This creates all tables (settings, topics, sources_config, items, favorites, notes, agent_chats, sync_log) with seed data for default topics and sources. Then run `supabase/002_add_llm_reasoning.sql` and `supabase/003_add_sources.sql` for the LLM reasoning column and the six keyless sources (Lobsters, Dev.to, Mastodon, arXiv, Hugging Face, Stack Exchange).
 
 ### Backend sources
 
@@ -161,3 +170,43 @@ The local run guards against duplicate execution via `last_run.txt`.
 - **Sync status**: Append-only sync_log table. Each run (local or Actions) inserts its outcome. The `GET /sync/status` endpoint returns the latest row plus `last_successful_sync_at` so the client can decide whether to show stale-data warnings.
 - **Chat idempotency**: Every user message carries a client-generated UUID. The server rejects duplicate `client_message_id` values, so retries after network drops produce exactly one reply.
 - **Retention**: Items that were ever favorited are preserved indefinitely. Only items never favorited and past the retention window are deleted.
+
+## Test UI
+
+A standalone HTML/JS/CSS test UI (`test-ui.html`) is served by a Python reverse proxy (`serve.py`). This is not a React app — it's a single-file UI for testing the API without rebuilding anything.
+
+### Running
+
+```bash
+# Start the Ktor backend on port 8081
+cd ktor-api
+java -jar build/libs/trend-hopper-api.jar
+
+# In another terminal, start the proxy on port 8080
+python serve.py
+# Opens at http://localhost:8080
+```
+
+### Features
+
+- **Dashboard**: stat cards, topic pills, calendar heatmap, recent items, source list
+- **Favorites**: favorited items with notes/chat indicators
+- **Detail page**: full-page view with hero image, YouTube embeds, article images grid
+- **Full article tab**: Medium-style formatting (drop caps, headings, blockquotes, code blocks)
+- **AI Format button**: calls Groq to reformat article text into clean HTML
+- **Chat with Agent**: sends messages to Groq with article context, persists history
+- **Search**: full-text search across items, topics, and sources
+- **Log panel**: fixed bottom-right, auto-opens on errors
+
+### Architecture
+
+```
+Browser (localhost:8080)
+  ├── GET /                    → serve.py → test-ui.html
+  ├── GET /api/agent/chat/*    → serve.py → Supabase REST API
+  ├── POST /api/agent/chat/*   → serve.py → Supabase + Groq
+  ├── POST /api/format-article → serve.py → Groq
+  └── everything else          → serve.py → Ktor (localhost:8081)
+```
+
+The proxy strips browser headers (`Origin`, `Sec-Fetch-*`, `Referer`) that cause Ktor CORS/auth errors on POST requests. Chat and formatting endpoints go directly to Supabase/Groq through the proxy, bypassing a Ktor double-encoding bug in the chat route.
